@@ -95,10 +95,11 @@ class Serv00Spider:
 
         if available:
             # 发现空位
-            notify_msg = f"@thubmskxxi 太棒了！Serv00 服务器可能有空位了！\n\n" \
-                         f"检测到的状态: {status_message}\n" \
-                         f"检查时间: {current_time_str}\n\n" \
-                         f"请尽快访问: {self.url}"
+            notify_msg = f"@thubmskxxi 🎉🎉🎉 太棒了！Serv00 服务器可能有空位了！ 🎉🎉🎉\n\n" \
+                         f"📊 检测到的状态: {status_message}\n" \
+                         f"⏰ 检查时间: {current_time_str}\n\n" \
+                         f"🔗 请尽快访问: {self.url}\n\n" \
+                         f"📷 状态图片: https://raw.githubusercontent.com/xxiThubmsk/Typora/main/img/image-20250330231844401.png"
             initialize.info_message(f"发现潜在空位！状态: {status_message}")
             initialize.info_message(notify_msg)
             
@@ -175,19 +176,37 @@ def main():
             # 如果是空位状态(5分钟间隔)，则立即发送通知
             if check_interval == 300:
                 initialize.info_message(f"发现空位！每5分钟重复发送通知，等待 {check_interval} 秒后再次通知...")
+                # 清空之前的消息，只保留最重要的通知信息
+                initialize.message_list.clear()
+                # 直接使用spider对象的方法获取最新状态
+                available, latest_status = spider.check_availability()
+                current_time = datetime.now()
+                current_time_str = current_time.strftime("%Y-%m-%d %H:%M:%S")
+                
+                initialize.info_message(f"@thubmskxxi 🎉🎉🎉 太棒了！Serv00 服务器可能有空位了！ 🎉🎉🎉\n\n"
+                                       f"📊 检测到的状态: {latest_status}\n"
+                                       f"⏰ 检查时间: {current_time_str}\n\n"
+                                       f"🔗 请尽快访问: {spider.url}\n\n"
+                                       f"📷 状态图片: https://raw.githubusercontent.com/xxiThubmsk/Typora/main/img/image-20250330231844401.png")
                 initialize.send_notify("Serv00服务器有空位通知")  # 立即发送通知
                 initialize.message_list.clear()  # 清空消息列表，确保下次通知不包含旧消息
             # 如果是心跳测试，也发送通知
             elif check_interval == -1:
                 initialize.info_message("发送心跳测试通知...")
-                try:
-                    # 添加一些调试信息
-                    initialize.info_message(f"消息列表长度: {len(initialize.message_list)}")
-                    initialize.info_message(f"消息内容: {initialize.message_list}")
-                    initialize.send_notify("Serv00服务器监控心跳测试")
-                    initialize.info_message("通知发送完成")
-                except Exception as e:
-                    initialize.error_message(f"发送通知时出错: {str(e)}")
+                # 清空之前的消息，只保留最重要的心跳信息
+                initialize.message_list.clear()
+                # 获取最新状态
+                available, latest_status = spider.check_availability()
+                current_time = datetime.now()
+                current_time_str = current_time.strftime("%Y-%m-%d %H:%M:%S")
+                
+                initialize.info_message(f"@thubmskxxi ✨ Serv00 监控脚本心跳检测 ✨\n\n"
+                           f"🤖 当前脚本仍在运行，持续监控中...\n\n"
+                           f"📊 检测到的最新服务器状态: {latest_status}\n"
+                           f"⏰ (状态检查于: {current_time_str})\n\n"
+                           f"🔗 服务器地址: {spider.url}\n\n"
+                           f"📷 状态图片: https://raw.githubusercontent.com/xxiThubmsk/Typora/main/img/image-20250330231844401.png")
+                initialize.send_notify("🔔 Serv00服务器监控心跳测试")
                 initialize.message_list.clear()  # 清空消息列表
                 check_interval = random.uniform(3, 10)  # 设置下一次检查的间隔
             else:
