@@ -132,7 +132,7 @@ class Serv00Spider:
             if should_send_test:
                 initialize.info_message(f"未发现空位，发送心跳测试通知 (当前间隔: {self.current_test_interval})。")
 
-                test_msg = f"Serv00 监控脚本心跳检测。\n\n" \
+                test_msg = f"@thubmskxxi Serv00 监控脚本心跳检测。\n\n" \
                            f"当前脚本仍在运行，持续监控中。\n\n" \
                            f"检测到的最新服务器状态: {status_message}\n" \
                            f"(状态检查于: {current_time_str})\n\n" \
@@ -149,6 +149,12 @@ class Serv00Spider:
                 if self.current_test_interval > self.max_test_interval:
                     self.current_test_interval = self.max_test_interval
                 initialize.info_message(f"心跳测试通知已发送。下一次测试通知间隔更新为: {self.current_test_interval}")
+                
+                # 返回特殊值-1表示这是心跳测试
+                return -1
+            
+            # 如果不需要发送测试通知，返回正常的随机检查间隔
+            return random.uniform(3, 10)
 
 
 def main():
@@ -170,6 +176,20 @@ def main():
             if check_interval == 300:
                 initialize.info_message(f"发现空位！每5分钟重复发送通知，等待 {check_interval} 秒后再次通知...")
                 initialize.send_notify("Serv00服务器有空位通知")  # 立即发送通知
+                initialize.message_list.clear()  # 清空消息列表，确保下次通知不包含旧消息
+            # 如果是心跳测试，也发送通知
+            elif check_interval == -1:
+                initialize.info_message("发送心跳测试通知...")
+                try:
+                    # 添加一些调试信息
+                    initialize.info_message(f"消息列表长度: {len(initialize.message_list)}")
+                    initialize.info_message(f"消息内容: {initialize.message_list}")
+                    initialize.send_notify("Serv00服务器监控心跳测试")
+                    initialize.info_message("通知发送完成")
+                except Exception as e:
+                    initialize.error_message(f"发送通知时出错: {str(e)}")
+                initialize.message_list.clear()  # 清空消息列表
+                check_interval = random.uniform(3, 10)  # 设置下一次检查的间隔
             else:
                 initialize.info_message(f"等待 {check_interval:.1f} 秒后进行下次检查...")
             
