@@ -96,6 +96,9 @@ push_config = {
     'SMTP_EMAIL': '',                   # SMTP 收发件邮箱，通知将会由自己发给自己
     'SMTP_PASSWORD': '',                # SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定
     'SMTP_NAME': '',                    # SMTP 收发件人姓名，可随意填写
+
+    
+    'DISCORD_WEBHOOK': '',              # Discord Webhook URL
 }
 notify_function = []
 # fmt: on
@@ -257,6 +260,28 @@ def iGot(title: str, content: str) -> None:
         print("iGot 推送成功！")
     else:
         print(f'iGot 推送失败！{response["errMsg"]}')
+        
+def discord_bot(title: str, content: str) -> None:
+    """
+    通过 Discord Webhook 推送消息。
+    """
+    if not push_config.get("DISCORD_WEBHOOK"):
+        print("Discord Webhook 未设置!!\n取消推送")
+        return
+    print("Discord Webhook 服务启动")
+
+    url = push_config.get("DISCORD_WEBHOOK")
+    data = {
+        "content": f"**{title}**\n{content}",
+        "username": "通知机器人"
+    }
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(url=url, json=data, headers=headers)
+
+    if response.status_code == 204:
+        print("Discord 推送成功！")
+    else:
+        print(f"Discord 推送失败！状态码：{response.status_code}")
 
 
 def serverJ(title: str, content: str) -> None:
@@ -328,8 +353,7 @@ def pushplus_bot(title: str, content: str) -> None:
     if not push_config.get("PUSH_PLUS_TOKEN"):
         print("PUSHPLUS 服务的 PUSH_PLUS_TOKEN 未设置!!\n取消推送")
         return
-    print("PUSHPLUS 服务启动")
-
+    print("PUSHPLUS 服务启动")  # 修复了括号
     url = "http://www.pushplus.plus/send"
     data = {
         "token": push_config.get("PUSH_PLUS_TOKEN"),
@@ -640,6 +664,8 @@ if push_config.get("AIBOTK_KEY") and push_config.get("AIBOTK_TYPE") and push_con
     notify_function.append(aibotk)
 if push_config.get("SMTP_SERVER") and push_config.get("SMTP_SSL") and push_config.get("SMTP_EMAIL") and push_config.get("SMTP_PASSWORD") and push_config.get("SMTP_NAME"):
     notify_function.append(smtp)
+if push_config.get("DISCORD_WEBHOOK"):
+    notify_function.append(discord_bot)
 
 
 def send(title: str, content: str) -> None:
