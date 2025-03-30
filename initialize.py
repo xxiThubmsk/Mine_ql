@@ -57,6 +57,16 @@ def message(message_content):
     message_list.append(message_content)
 
 
+def clear_messages():
+    """
+    清空消息列表
+    
+    :return:
+    """
+    message_list.clear()
+    logging.info("消息列表已清空")
+
+
 def send_notify(title):
     """
     发送通知
