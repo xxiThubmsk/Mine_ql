@@ -21,7 +21,14 @@ import initialize
 
 class AccuWeatherMonitor:
     def __init__(self):
-        self.api_key = "6rNvIz1GFFALoeArmv2kwHr8CwD7CbtJ"
+        # API池配置
+        self.api_keys = [
+            "6rNvIz1GFFALoeArmv2kwHr8CwD7CbtJ",
+            "lO7WxNbOs0TMUJfnxKQESMF1eKvHF9jj",  # 请替换为你的其他API密钥
+            "mHbHIH8Yynn66b5DVwlVRtftArYN5Kvc",
+            # "YOUR_API_KEY_4"
+        ]
+        self.current_api_index = 0
         self.latitude = 34.784658
         self.longitude = 113.819502
         self.language = "zh"
@@ -32,37 +39,62 @@ class AccuWeatherMonitor:
         self.location_key = None
         self.location_info = None
 
+    def get_next_api_key(self):
+        """获取下一个可用的API密钥"""
+        self.current_api_index = (self.current_api_index + 1) % len(self.api_keys)
+        return self.api_keys[self.current_api_index]
+
+    def make_request(self, url, params):
+        """统一的请求处理函数，支持API轮询"""
+        max_retries = len(self.api_keys)
+        retries = 0
+        
+        while retries < max_retries:
+            try:
+                params["apikey"] = self.api_keys[self.current_api_index]
+                response = requests.get(url, params=params, timeout=20)
+                response.raise_for_status()
+                
+                # 检查响应是否有效
+                data = response.json()
+                if data:  # 可以根据实际情况添加更具体的验证
+                    return data
+                
+            except (requests.exceptions.RequestException, ValueError) as e:
+                initialize.error_message(f"API请求失败 (key: {params['apikey']}): {str(e)}")
+                
+            # 如果当前API失败，切换到下一个
+            self.current_api_index = (self.current_api_index + 1) % len(self.api_keys)
+            retries += 1
+            
+        return None
+
     def get_location_key(self):
         """获取位置的Key"""
         try:
             params = {
-                "apikey": self.api_key,
                 "q": f"{self.latitude},{self.longitude}",
                 "language": self.language,
                 "details": self.details
             }
             
-            # initialize.info_message(f"🔍 正在获取位置信息...")
-            response = requests.get(self.location_base_url, params=params, timeout=20)
-            response.raise_for_status()
-            
-            self.location_info = response.json()
+            data = self.make_request(self.location_base_url, params)
+            if not data:
+                initialize.error_message("❌ 所有API均无法获取位置信息")
+                return None
+                
+            self.location_info = data
             self.location_key = self.location_info.get("Key")
             
             if self.location_key:
                 location_name = self.location_info.get("LocalizedName", "未知位置")
                 admin_area = self.location_info.get("AdministrativeArea", {}).get("LocalizedName", "")
                 country = self.location_info.get("Country", {}).get("LocalizedName", "")
-                
-                # initialize.info_message(f"📍 位置信息获取成功: {country} {admin_area} {location_name}")
                 return self.location_key
             else:
                 initialize.error_message("❌ 无法获取位置Key")
                 return None
                 
-        except requests.exceptions.RequestException as e:
-            initialize.error_message(f"❌ 获取位置信息时出错: {str(e)}")
-            return None
         except Exception as e:
             initialize.error_message(f"❌ 获取位置信息时发生未知错误: {str(e)}")
             return None
@@ -75,27 +107,19 @@ class AccuWeatherMonitor:
             
         try:
             params = {
-                "apikey": self.api_key,
                 "language": self.language,
                 "details": self.details
             }
             
-            # initialize.info_message(f"🌤️ 正在获取当前天气信息...")
             url = f"{self.current_conditions_url}{self.location_key}"
-            response = requests.get(url, params=params, timeout=20)
-            response.raise_for_status()
+            weather_data = self.make_request(url, params)
             
-            weather_data = response.json()
             if weather_data and len(weather_data) > 0:
-                # initialize.info_message(f"✅ 当前天气信息获取成功")
                 return weather_data[0]
             else:
                 initialize.error_message("❌ 获取到的天气数据为空")
                 return None
                 
-        except requests.exceptions.RequestException as e:
-            initialize.error_message(f"❌ 获取当前天气信息时出错: {str(e)}")
-            return None
         except Exception as e:
             initialize.error_message(f"❌ 获取当前天气信息时发生未知错误: {str(e)}")
             return None
@@ -108,28 +132,20 @@ class AccuWeatherMonitor:
             
         try:
             params = {
-                "apikey": self.api_key,
                 "language": self.language,
                 "details": self.details,
                 "metric": "true"  # 使用公制单位
             }
             
-            # initialize.info_message(f"📅 正在获取5天天气预报...")
             url = f"{self.forecast_url}{self.location_key}"
-            response = requests.get(url, params=params, timeout=20)
-            response.raise_for_status()
+            forecast_data = self.make_request(url, params)
             
-            forecast_data = response.json()
             if forecast_data and "DailyForecasts" in forecast_data:
-                # initialize.info_message(f"✅ 天气预报获取成功")
                 return forecast_data
             else:
                 initialize.error_message("❌ 获取到的天气预报数据为空")
                 return None
                 
-        except requests.exceptions.RequestException as e:
-            initialize.error_message(f"❌ 获取天气预报时出错: {str(e)}")
-            return None
         except Exception as e:
             initialize.error_message(f"❌ 获取天气预报时发生未知错误: {str(e)}")
             return None
