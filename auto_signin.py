@@ -1,9 +1,24 @@
 import requests
 import time
 import os
+from datetime import datetime, timezone
+import initialize
 
-# 签到函数
+def check_cookie_expiration():
+    # user_id 过期时间
+    expiration_date = datetime(2025, 4, 17, 11, 32, 31, tzinfo=timezone.utc)
+    current_time = datetime.now(timezone.utc)
+    days_remaining = (expiration_date - current_time).days
+    
+    if days_remaining <= 30:  # 如果剩余天数小于30天
+        initialize.error_message(f"⚠️ 警告：Cookie 将在 {days_remaining} 天后过期，请及时更新！")
+    return days_remaining > 0  # 返回 cookie 是否有效
+
 def checkin():
+    if not check_cookie_expiration():
+        initialize.error_message("❌ Cookie 已过期，请更新后再试！")
+        return
+        
     url = "https://www.xxworld.org/api/checkin"
     
     headers = {
@@ -19,13 +34,15 @@ def checkin():
     try:
         response = requests.post(url, headers=headers)
         if response.status_code == 200:
-            print("签到成功！")
-            print(f"响应内容: {response.text}")
+            initialize.info_message("✅ 签到成功！")
+            initialize.info_message(f"响应内容: {response.text}")
         else:
-            print(f"签到失败，状态码: {response.status_code}")
-            print(f"错误信息: {response.text}")
+            initialize.error_message(f"❌ 签到失败，状态码: {response.status_code}")
+            initialize.error_message(f"错误信息: {response.text}")
     except Exception as e:
-        print(f"发生错误: {str(e)}")
+        initialize.error_message(f"❌ 发生错误: {str(e)}")
 
 if __name__ == "__main__":
+    initialize.init()  # 初始化日志系统
     checkin()
+    initialize.send_notify("XXWorld 自动签到")  # 发送通知
