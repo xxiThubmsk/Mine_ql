@@ -15,17 +15,9 @@ cron: 55 1,9,16 * * *
 import os
 import re
 import json
-import logging
-from typing import Optional, List
 import requests
 from datetime import datetime
-
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+import initialize  # 引入初始化模块
 
 class TastyBurger:
     BASE_URL = "https://sss-web.tastientech.com/api"
@@ -38,14 +30,8 @@ class TastyBurger:
             'version': self.VERSION,
             'channel': '1'
         }
-        self.log_messages = []
 
-    def log(self, message: str):
-        """统一日志处理"""
-        logger.info(message)
-        self.log_messages.append(f"{message}\n")
-
-    def get_activity_id(self) -> Optional[str]:
+    def get_activity_id(self):
         """获取签到活动ID"""
         try:
             data = {
@@ -59,34 +45,73 @@ class TastyBurger:
                 f"{self.BASE_URL}/minic/shop/intelligence/banner/c/list",
                 json=data,
                 headers=self.headers
-            ).json()
+            )
             
-            for item in response.get('result', []):
-                if item['bannerName'] == '每日签到':
+            response_json = response.json()
+            
+            for item in response_json.get('result', []):
+                if '每日签到' in item.get('bannerName', ''):
                     qd = item['jumpPara']
-                    activity_id = re.findall('activityId%2522%253A(.*?)%257D', qd)[0]
-                    self.log(f"获取到本月签到代码：{activity_id}")
-                    return activity_id
+                    activity_id = json.loads(qd)['activityId']
+                    initialize.info_message(f"获取到本月签到代码：{activity_id}")
+                    return str(activity_id)
             return None
         except Exception as e:
-            self.log(f"获取活动ID失败: {str(e)}")
+            initialize.error_message(f"获取活动ID失败: {str(e)}")
             return None
 
-    def sign_in(self) -> bool:
-        """执行签到流程"""
+    def get_points(self):
+        """查询积分余额"""
         try:
-            # 获取用户信息
-            user_info = requests.get(
+            response = requests.get(
                 f"{self.BASE_URL}/intelligence/member/getMemberDetail",
                 headers=self.headers
             ).json()
             
+            if response['code'] == 200:
+                points = response['result']['point']
+                initialize.info_message(f"当前积分：{points}")
+                return points
+            return None
+        except Exception as e:
+            initialize.error_message(f"查询积分失败: {str(e)}")
+            return None
+
+    def get_sign_history(self):
+        """查询本月签到记录"""
+        try:
+            activity_id = self.get_activity_id()
+            if not activity_id:
+                return
+                
+            response = requests.get(
+                f"{self.BASE_URL}/sign/member/getSignRecordV2?activityId={activity_id}",
+                headers=self.headers
+            ).json()
+            
+            if response['code'] == 200:
+                total_days = response['result'].get('totalSignDays', 0)
+                initialize.info_message(f"本月已签到：{total_days}天")
+        except Exception as e:
+            initialize.error_message(f"查询签到记录失败: {str(e)}")
+
+    def sign_in(self):
+        """执行签到流程"""
+        try:
+            # 获取用户信息
+            response = requests.get(
+                f"{self.BASE_URL}/intelligence/member/getMemberDetail",
+                headers=self.headers
+            )
+            
+            user_info = response.json()
+            
             if user_info['code'] != 200:
-                self.log(f"获取用户信息失败: {user_info.get('msg', '未知错误')}")
+                initialize.error_message(f"获取用户信息失败: {user_info.get('msg', '未知错误')}")
                 return False
                 
             phone = user_info['result']['phone']
-            self.log(f"账号：{phone} 登录成功")
+            initialize.info_message(f"账号：{phone} 登录成功")
             
             # 获取活动ID并签到
             activity_id = self.get_activity_id() or "57"
@@ -107,49 +132,46 @@ class TastyBurger:
             if sign_result['code'] == 200:
                 reward = sign_result['result']['rewardInfoList'][0]
                 if reward['rewardName']:
-                    self.log(f"签到情况：获得 {reward['rewardName']}")
+                    initialize.info_message(f"签到情况：获得 {reward['rewardName']}")
                 else:
-                    self.log(f"签到情况：获得 {reward['point']} 积分")
+                    initialize.info_message(f"签到情况：获得 {reward['point']} 积分")
+                # 在签到完成后查询积分和签到历史
+                self.get_points()
+                self.get_sign_history()
                 return True
             else:
-                self.log(f"签到情况：{sign_result.get('msg', '签到失败')}")
+                initialize.error_message(f"签到情况：{sign_result.get('msg', '签到失败')}")
                 return False
                 
         except Exception as e:
-            self.log(f"签到过程出错: {str(e)}")
+            initialize.error_message(f"签到过程出错: {str(e)}")
             return False
 
 def main():
+    initialize.init()  # 初始化日志系统
+    
     # 获取环境变量中的账号信息
     tokens = re.split("@|&", os.environ.get("tsthbck", ""))
     if not tokens or tokens == ['']:
-        logger.error("未找到账号配置，请设置环境变量 tsthbck")
+        initialize.error_message("未找到账号配置，请设置环境变量 tsthbck")
         return
 
-    logger.info(f"共找到 {len(tokens)} 个账号")
-    all_messages = []
+    initialize.info_message(f"共找到 {len(tokens)} 个账号")
     
     for i, token in enumerate(tokens, 1):
         if not token.strip():
             continue
             
-        logger.info(f"开始处理第 {i} 个账号")
-        logger.info("----------------------")
+        initialize.info_message(f"开始处理第 {i} 个账号")
+        initialize.info_message("----------------------")
         
         burger = TastyBurger(token)
         burger.sign_in()
-        all_messages.extend(burger.log_messages)
         
-        logger.info("----------------------")
+        initialize.info_message("----------------------")
 
     # 发送通知
-    try:
-        from sendNotify import send
-        send("塔斯汀汉堡", ''.join(all_messages))
-    except ImportError:
-        logger.warning("未找到通知模块，跳过通知发送")
-    except Exception as e:
-        logger.error(f"发送通知失败: {str(e)}")
+    initialize.send_notify("塔斯汀汉堡自动签到")
 
 if __name__ == '__main__':
     main()
